@@ -148,10 +148,15 @@ impl App {
 
         let mut gpu_quads: Vec<object::quad::GpuQuad> = vec![];
         
-        for (_pos, go) in &self.gameobjects {
+        for (pos, go) in &self.gameobjects {
             let quads = go.get_renderables();
 
             for quad in quads {
+                let facing_block_pos = 2.0*(quad.center()-pos) + pos;
+                if self.gameobjects.contains_key(&facing_block_pos) {
+                    continue;
+                }
+                
                 let q = quad.as_any().downcast_ref::<object::Quad>().unwrap();
                 gpu_quads.push(q.to_gpu());
             }
