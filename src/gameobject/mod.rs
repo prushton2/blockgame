@@ -1,8 +1,10 @@
 use render_engine::{ds::Ray, object::Renderable};
 
 pub mod block;
+pub mod player;
 
 pub use block::Block;
+pub use player::Player;
 
 pub trait GameObject {
     fn get_renderables(&self) -> &Vec<Box<dyn Renderable>>;

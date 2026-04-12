@@ -44,12 +44,12 @@ impl GameObject for Block {
     }
 
     fn intersects(&self, ray: &Ray) -> Option<(f64, &dyn Renderable)> {
-        // if Aabb::from_vector3(
-        //     &(self.pos + Vector3::new(-0.5, -0.5, -0.5)),
-        //     &(self.pos + Vector3::new(0.5, 0.5, 0.5))
-        // ).intersects(ray).is_none() {
-        //     return None;
-        // }
+        if Aabb::from_vector3(
+            &(self.pos + Vector3::new(-0.5, -0.5, -0.5)),
+            &(self.pos + Vector3::new(0.5, 0.5, 0.5))
+        ).intersects(ray).is_none() {
+            return None;
+        }
         let mut lowest_t: Option<f64> = None;
         let mut reference: Option<&dyn Renderable> = None;
 

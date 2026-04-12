@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::sync::{Arc};
 
-use clap::Parser;
+use clap::{Parser};
 use render_engine::ds::Vector3;
 use render_engine::object::Renderable;
 use winit::application::ApplicationHandler;
@@ -33,24 +33,34 @@ struct Arguments {
 
     #[arg(short = 'v', long, default_value_t = 60.0)]
     pub fov: f64,
-
-    #[arg(default_value_t = 1920)]
+}
+struct Config {
+    pub sensitivity: f64,
+    pub framelimit: u64,
+    pub movespeed: f64,
+    pub fov: f64,
     pub width: usize,
-    #[arg(default_value_t = 1080)]
-    pub height: usize,
+    pub height: usize
 }
 
-impl Arguments {
-    fn update(&mut self) {
-        let mut split = self.resolution.split('x');
+impl From<Arguments> for Config {
+    fn from(a: Arguments) -> Self {
+        let mut split = a.resolution.split('x');
         let res_err = "Invalid resolution";
-        (self.width, self.height) = (
+        let (width, height) = (
             split.next().expect(res_err).parse().expect(res_err),
             split.next().expect(res_err).parse().expect(res_err)
         );
 
-        if self.framelimit > 1000 {
-            self.framelimit = 1000;
+        let framelimit = a.framelimit.min(1000);
+
+        Self {
+            sensitivity: a.sensitivity,
+            framelimit: framelimit,
+            movespeed: a.movespeed,
+            fov: a.fov,
+            width: width,
+            height: height
         }
     }
 }
@@ -61,25 +71,21 @@ struct App {
     gpu:    wgpu_handler::GpuHandler,
 
     // scene
-    player:  object::Player,
+    player:  gameobject::Player,
     gameobjects: HashMap<Vector3, Box<dyn GameObject>>,
 
     // input
     keyboard:     HashMap<KeyCode, bool>,
     mouse_delta: (f64, f64),
-    config:       Arguments,
+    config:       Config,
 
     // statistics
     last_frame: std::time::Instant,
     deltatime:  f64,
-
-    fps_stat:         u32,
-    deltatime_stat:   u32,
-    statistics_timer: std::time::Instant,
 }
 
 impl App {
-    pub fn new(config: Arguments, player: object::Player) -> Self {
+    pub fn new(config: Config, player: gameobject::Player) -> Self {
         Self {
             window: None,
             gpu:    wgpu_handler::GpuHandler::default(),
@@ -99,10 +105,6 @@ impl App {
 
             last_frame: std::time::Instant::now(),
             deltatime:  0.0,
-
-            fps_stat:         0,
-            deltatime_stat:   0,
-            statistics_timer: std::time::Instant::now(),
         }
     }
 
@@ -240,19 +242,6 @@ impl ApplicationHandler for App {
                     frame.present();
                 }
                 
-                // let player = self.player.read().unwrap();
-                
-                // if self.statistics_timer.elapsed().as_millis() >= 1000 {
-                //     self.fps_stat = (1.0/self.deltatime) as u32;
-                //     self.deltatime_stat = (1000.0 * self.deltatime) as u32;
-                //     self.statistics_timer = std::time::Instant::now();
-                // }
-                
-                // print!("\x1B[2J\x1B[1;1H");
-                // println!(" FPS: {}\n\n Time between frames: {}ms\n\n Camera position: {:?}\n Player Rotation: {:?}", self.fps_stat, self.deltatime_stat, player.get_camera().pos(), player.get_rotation());
-
-                // this makes the deltatime not crash out when the fps gets too high,
-                // but caps the fps at 1000
                 if self.deltatime < 1000.0/self.config.framelimit as f64 {
                     let mut duration = std::time::Duration::from_millis(1000/self.config.framelimit);
                     duration -= std::time::Duration::from_millis(self.deltatime as u64);
@@ -359,24 +348,20 @@ fn get_renderable_looking_at<'a>(ray: &ds::Ray, gameobjects: &'a HashMap<Vector3
 fn main() {
     debug_assert_eq!(std::mem::size_of::<object::camera::GpuUniform>() % 256, 0);
 
-    let mut args = Arguments::parse();
-    args.update();
+    let args = Arguments::parse();
+    let config: Config = args.into();
 
-    let camera = object::Camera::new(
+    let player = gameobject::Player::new(
         ds::Vector3::new(0.0, 0.0, 0.0),
-        3.0,
-        (args.width as f64, args.height as f64),
-        args.fov
-    );
-
-    let player = object::Player::new(
-        camera
+        ds::Vector3::zero(),
+        config.fov,
+        (config.width as f64, config.height as f64),
     );
 
     let event_loop = EventLoop::new().expect("Failed to create event loop");
     event_loop.set_control_flow(ControlFlow::Poll);
 
-    let mut app = App::new(args, player);
+    let mut app = App::new(config, player);
 
     event_loop.run_app(&mut app).expect("Event loop failed");
 }
