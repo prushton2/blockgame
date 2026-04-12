@@ -1,4 +1,4 @@
-use render_engine::object::Renderable;
+use render_engine::{ds::Ray, object::Renderable};
 
 pub mod block;
 
@@ -6,6 +6,7 @@ pub use block::Block;
 
 pub trait GameObject {
     fn get_renderables(&self) -> &Vec<Box<dyn Renderable>>;
+    fn intersects(&self, ray: &Ray) -> Option<(f64, &dyn Renderable)>;
 }
 
 pub enum Faces {

@@ -5,7 +5,7 @@ version = 4
 [[package]]
 name = "RenderEngine"
 version = "1.93.0"
-source = "git+https://github.com/prushton2/renderengine.git?tag=v1.3.5#93ba77f015ae5aa44bb029b5aad70bbcb53f9b4d"
+source = "git+https://github.com/prushton2/renderengine.git?tag=v1.3.9#42b6727369539b169a4c5d439197a1d4d9dff748"
 dependencies = [
  "auto_ops",
  "bytemuck",

@@ -1,8 +1,9 @@
 use std::collections::HashMap;
-use std::sync::{Arc, RwLock};
+use std::sync::{Arc};
 
 use clap::Parser;
 use render_engine::ds::Vector3;
+use render_engine::object::Renderable;
 use winit::application::ApplicationHandler;
 use winit::event::{ElementState, KeyEvent, WindowEvent, DeviceEvent, DeviceId};
 use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop};
@@ -60,7 +61,7 @@ struct App {
     gpu:    wgpu_handler::GpuHandler,
 
     // scene
-    player:  RwLock<object::Player>,
+    player:  object::Player,
     gameobjects: HashMap<Vector3, Box<dyn GameObject>>,
 
     // input
@@ -83,10 +84,12 @@ impl App {
             window: None,
             gpu:    wgpu_handler::GpuHandler::default(),
 
-            player:  RwLock::new(player),
+            player:  player,
             gameobjects: HashMap::from([
-                (Vector3::new(0.0,  0.0, 3.0), Box::new(gameobject::Block::new_grass_block(&Vector3::new(0.0, 0.0, 3.0))) as Box<dyn GameObject>),
-                (Vector3::new(0.0, -1.0, 3.0), Box::new(gameobject::Block::new_dirt_block(&Vector3::new(0.0, -1.0, 3.0))) as Box<dyn GameObject>)
+                (Vector3::new( 0.0,  0.0, 3.0), Box::new(gameobject::Block::new_grass_block(&Vector3::new(0.0, 0.0, 3.0))) as Box<dyn GameObject>),
+                (Vector3::new( 0.0, -1.0, 3.0), Box::new(gameobject::Block::new_dirt_block(&Vector3::new(0.0, -1.0, 3.0))) as Box<dyn GameObject>),
+                (Vector3::new( 1.0, -1.0, 3.0), Box::new(gameobject::Block::new_grass_block(&Vector3::new(1.0, -1.0, 3.0))) as Box<dyn GameObject>),
+                (Vector3::new(-1.0, -1.0, 3.0), Box::new(gameobject::Block::new_grass_block(&Vector3::new(-1.0, -1.0, 3.0))) as Box<dyn GameObject>)
             ]),
 
 
@@ -104,7 +107,7 @@ impl App {
     }
 
     pub fn handle_movement(&mut self) {
-        let mut player_ref = self.player.write().unwrap();
+        // let mut player_ref = self.player();
         let key_movements: &[(KeyCode, ds::Vector3)] = &[
             (KeyCode::KeyW,        ds::Vector3::new( 0.0,  0.0,  1.0)),
             (KeyCode::KeyS,        ds::Vector3::new( 0.0,  0.0, -1.0)),
@@ -123,28 +126,26 @@ impl App {
 
         for (key, dir) in key_movements {
             if self.keyboard.get(key) == Some(&true) {
-                player_ref.move_player(&(dir * self.config.movespeed * self.deltatime));
+                self.player.move_player(&(dir * self.config.movespeed * self.deltatime));
             }
         }
 
         for (key, dir) in key_rotations {
             if self.keyboard.get(key) == Some(&true) {
-                player_ref.change_rotation(dir * self.deltatime);
+                self.player.change_rotation(dir * self.deltatime);
             }
         }
 
-        player_ref.change_rotation(ds::Vector3::new(-self.mouse_delta.1, 0.0, self.mouse_delta.0));
+        self.player.change_rotation(ds::Vector3::new(-self.mouse_delta.1, 0.0, self.mouse_delta.0));
         self.mouse_delta = (0.0, 0.0);
 
-        player_ref.update_outputs();
+        self.player.update_outputs();
     }
 
     pub fn render(&self) -> Option<wgpu::SurfaceTexture> {
 
-        let player = self.player.read().unwrap();
-
         // downcast objects
-        let mut uniform = player.get_camera().to_gpu();
+        let mut uniform = self.player.get_camera().to_gpu();
 
         let mut gpu_quads: Vec<object::quad::GpuQuad> = vec![];
         
@@ -171,7 +172,7 @@ impl ApplicationHandler for App {
         let window = Arc::new(
             event_loop.create_window(
                 Window::default_attributes()
-                    .with_title("Render Engine")
+                    .with_title("Minceraft")
                     .with_inner_size(winit::dpi::LogicalSize::new(self.config.width as f64, self.config.height as f64))
             ).unwrap()
         );
@@ -232,23 +233,23 @@ impl ApplicationHandler for App {
                 let window = self.window.as_ref().unwrap();
                 let size = window.inner_size();
                 
-                self.player.write().unwrap().get_camera_mut().set_window_size(size.width.into(), size.height.into());
+                self.player.get_camera_mut().set_window_size(size.width.into(), size.height.into());
                 self.handle_movement();
                 
                 if let Some(frame) = self.render() {
                     frame.present();
                 }
                 
-                let player = self.player.read().unwrap();
+                // let player = self.player.read().unwrap();
                 
-                if self.statistics_timer.elapsed().as_millis() >= 1000 {
-                    self.fps_stat = (1.0/self.deltatime) as u32;
-                    self.deltatime_stat = (1000.0 * self.deltatime) as u32;
-                    self.statistics_timer = std::time::Instant::now();
-                }
+                // if self.statistics_timer.elapsed().as_millis() >= 1000 {
+                //     self.fps_stat = (1.0/self.deltatime) as u32;
+                //     self.deltatime_stat = (1000.0 * self.deltatime) as u32;
+                //     self.statistics_timer = std::time::Instant::now();
+                // }
                 
-                print!("\x1B[2J\x1B[1;1H");
-                println!(" FPS: {}\n\n Time between frames: {}ms\n\n Camera position: {:?}\n Player Rotation: {:?}", self.fps_stat, self.deltatime_stat, player.get_camera().pos(), player.get_rotation());
+                // print!("\x1B[2J\x1B[1;1H");
+                // println!(" FPS: {}\n\n Time between frames: {}ms\n\n Camera position: {:?}\n Player Rotation: {:?}", self.fps_stat, self.deltatime_stat, player.get_camera().pos(), player.get_rotation());
 
                 // this makes the deltatime not crash out when the fps gets too high,
                 // but caps the fps at 1000
@@ -285,6 +286,29 @@ impl ApplicationHandler for App {
                 match (keycode, state) {
                     // special functions
                     (KeyCode::Escape, ElementState::Pressed) => event_loop.exit(),
+                    (KeyCode::KeyE, ElementState::Pressed) => {
+                        let ray = ds::Ray::new(&self.player.get_camera().pos(), &(self.player.get_camera().dir() - self.player.get_camera().pos()));
+
+                        let (t, renderable, go_pos) = match get_renderable_looking_at(&ray, &self.gameobjects) {
+                            Some(t) => t,
+                            None => return
+                        };
+
+                        let new_center = go_pos - renderable.normal(&ray.at(t));
+                        
+                        self.gameobjects.insert(new_center, Box::new(gameobject::Block::new_dirt_block(&new_center)));
+
+                    },
+                    (KeyCode::KeyQ, ElementState::Pressed) => {
+                        let ray = ds::Ray::new(&self.player.get_camera().pos(), &(self.player.get_camera().dir() - self.player.get_camera().pos()));
+
+                        let (_t, _renderable, go_pos) = match get_renderable_looking_at(&ray, &self.gameobjects) {
+                            Some(t) => t,
+                            None => return
+                        };
+
+                        self.gameobjects.remove(&go_pos);
+                    }
                     (keycode, pressed) => {
                         // everything else is mapped to the keyboard hashmap
                         self.keyboard.insert(keycode, pressed == ElementState::Pressed);
@@ -295,6 +319,41 @@ impl ApplicationHandler for App {
             _ => {}
         }
     }
+}
+
+fn get_renderable_looking_at<'a>(ray: &ds::Ray, gameobjects: &'a HashMap<Vector3, Box<dyn GameObject>>) -> Option<(f64, &'a dyn Renderable, Vector3)> {
+    let mut closest_renderable: Option<(f64, &dyn Renderable)> = None;
+    let mut closest_pos: Vector3 = Vector3::zero();
+
+    for (pos, go) in gameobjects {
+        // println!("Checking block at {:?}", pos);
+        let intersection = go.intersects(&ray);
+
+        if intersection.is_none() {
+            // println!("  No Intersection");
+            continue;
+        }
+
+        if closest_renderable.is_none() {
+            closest_renderable = intersection;
+            closest_pos = pos.clone();
+        } else {
+            if intersection.unwrap().0 < closest_renderable.unwrap().0 {
+                closest_renderable = intersection;
+                closest_pos = pos.clone();
+            }
+        }
+    }
+
+    if closest_renderable.is_none() {
+        return None;
+    }
+
+    return Some((
+        closest_renderable.unwrap().0,
+        closest_renderable.unwrap().1,
+        closest_pos
+    ))
 }
 
 fn main() {
