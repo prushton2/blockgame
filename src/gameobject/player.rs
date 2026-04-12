@@ -1,4 +1,8 @@
-use render_engine::{ds, object};
+use std::collections::HashMap;
+
+use render_engine::{ds::{self, Vector3}, object::{self, Renderable}};
+
+use crate::gameobject::GameObject;
 
 pub struct Player {
     camera: object::Camera,
@@ -16,6 +20,7 @@ impl Player {
         this.camera.update_outputs();
         this
     }
+
     pub fn change_rotation(&mut self, delta: ds::Vector3) {
         self.rotation = self.rotation + delta;
 
@@ -46,6 +51,35 @@ impl Player {
         ));
     }
 
+    pub fn forward_ray(&self) -> ds::Ray {
+        ds::Ray::new(&self.get_camera().pos(), &(self.get_camera().dir() - self.get_camera().pos()))
+    }
+
+    pub fn get_looking_at<'a>(&self, world: &'a HashMap<Vector3, Box<dyn GameObject>>) -> Option<LookingAt<'a>> {
+        let ray = self.forward_ray();
+        let mut closest: Option<LookingAt> = None;
+
+        for (_pos, go) in world {
+            let intersection = go.intersects(&ray);
+
+            if intersection.is_none() {
+                continue;
+            }
+
+            if closest.is_none() || intersection.unwrap().0 < closest.unwrap().t{
+                closest = Some(LookingAt {
+                    t: intersection.unwrap().0,
+                    gameobject: go.as_ref(),
+                    renderable: intersection.unwrap().1
+                });
+            }
+        }
+
+        return closest;
+    }
+
+    // pub fn get_looking_at(&self, )
+
     pub fn get_rotation(&self) -> ds::Vector3 {
         self.rotation
     }
@@ -61,4 +95,11 @@ impl Player {
     pub fn update_outputs(&mut self) {
         self.camera.update_outputs();
     }
+}
+
+#[derive(Clone, Copy)]
+pub struct LookingAt<'a> {
+    pub t:          f64,
+    pub gameobject: &'a dyn GameObject,
+    pub renderable: &'a dyn Renderable
 }

@@ -70,4 +70,8 @@ impl GameObject for Block {
             None => return None
         }
     }
+
+    fn get_pos(&self) -> render_engine::ds::Vector3 {
+        self.pos
+    }
 }

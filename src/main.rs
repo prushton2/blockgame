@@ -276,27 +276,23 @@ impl ApplicationHandler for App {
                     // special functions
                     (KeyCode::Escape, ElementState::Pressed) => event_loop.exit(),
                     (KeyCode::KeyE, ElementState::Pressed) => {
-                        let ray = ds::Ray::new(&self.player.get_camera().pos(), &(self.player.get_camera().dir() - self.player.get_camera().pos()));
-
-                        let (t, renderable, go_pos) = match get_renderable_looking_at(&ray, &self.gameobjects) {
+                        let ray = self.player.forward_ray();
+                        let looking_at = match self.player.get_looking_at(&self.gameobjects) {
                             Some(t) => t,
                             None => return
                         };
 
-                        let new_center = go_pos - renderable.normal(&ray.at(t));
+                        let new_center = looking_at.gameobject.get_pos() - looking_at.renderable.normal(&ray.at(looking_at.t));
                         
                         self.gameobjects.insert(new_center, Box::new(gameobject::Block::new_dirt_block(&new_center)));
-
                     },
                     (KeyCode::KeyQ, ElementState::Pressed) => {
-                        let ray = ds::Ray::new(&self.player.get_camera().pos(), &(self.player.get_camera().dir() - self.player.get_camera().pos()));
-
-                        let (_t, _renderable, go_pos) = match get_renderable_looking_at(&ray, &self.gameobjects) {
+                        let looking_at = match self.player.get_looking_at(&self.gameobjects) {
                             Some(t) => t,
                             None => return
                         };
-
-                        self.gameobjects.remove(&go_pos);
+                        
+                        self.gameobjects.remove(&looking_at.gameobject.get_pos());
                     }
                     (keycode, pressed) => {
                         // everything else is mapped to the keyboard hashmap
@@ -308,41 +304,6 @@ impl ApplicationHandler for App {
             _ => {}
         }
     }
-}
-
-fn get_renderable_looking_at<'a>(ray: &ds::Ray, gameobjects: &'a HashMap<Vector3, Box<dyn GameObject>>) -> Option<(f64, &'a dyn Renderable, Vector3)> {
-    let mut closest_renderable: Option<(f64, &dyn Renderable)> = None;
-    let mut closest_pos: Vector3 = Vector3::zero();
-
-    for (pos, go) in gameobjects {
-        // println!("Checking block at {:?}", pos);
-        let intersection = go.intersects(&ray);
-
-        if intersection.is_none() {
-            // println!("  No Intersection");
-            continue;
-        }
-
-        if closest_renderable.is_none() {
-            closest_renderable = intersection;
-            closest_pos = pos.clone();
-        } else {
-            if intersection.unwrap().0 < closest_renderable.unwrap().0 {
-                closest_renderable = intersection;
-                closest_pos = pos.clone();
-            }
-        }
-    }
-
-    if closest_renderable.is_none() {
-        return None;
-    }
-
-    return Some((
-        closest_renderable.unwrap().0,
-        closest_renderable.unwrap().1,
-        closest_pos
-    ))
 }
 
 fn main() {
