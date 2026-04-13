@@ -5,7 +5,7 @@ version = 4
 [[package]]
 name = "RenderEngine"
 version = "1.93.0"
-source = "git+https://github.com/prushton2/renderengine.git?tag=v1.3.9#42b6727369539b169a4c5d439197a1d4d9dff748"
+source = "git+https://github.com/prushton2/renderengine.git?tag=v1.4.0#44655eacac3911ae8f75ebec623a1a4c27153906"
 dependencies = [
  "auto_ops",
  "bytemuck",
@@ -352,6 +352,7 @@ version = "0.1.0"
 dependencies = [
  "RenderEngine",
  "clap",
+ "image",
  "pollster",
  "wgpu",
  "winit",

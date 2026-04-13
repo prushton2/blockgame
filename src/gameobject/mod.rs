@@ -12,12 +12,3 @@ pub trait GameObject {
 
     fn get_pos(&self) -> ds::Vector3;
 }
-
-pub enum Faces {
-    Front,
-    Back,
-    Left,
-    Right,
-    Up,
-    Down
-}

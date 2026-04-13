@@ -1,9 +1,12 @@
 use std::collections::HashMap;
 use std::sync::{Arc};
 
+use image::ImageReader;
 use clap::{Parser};
 use render_engine::ds::Vector3;
-use render_engine::object::Renderable;
+use render_engine::ui::ui_element::GPUUIElement;
+use render_engine::ui::{self, Image};
+use wgpu::naga::valid::WidthError;
 use winit::application::ApplicationHandler;
 use winit::event::{ElementState, KeyEvent, WindowEvent, DeviceEvent, DeviceId};
 use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop};
@@ -69,6 +72,7 @@ struct App {
     // window
     window: Option<Arc<Window>>,
     gpu:    wgpu_handler::GpuHandler,
+    ui:     Vec<ui::UIElement>,
 
     // scene
     player:  gameobject::Player,
@@ -89,6 +93,16 @@ impl App {
         Self {
             window: None,
             gpu:    wgpu_handler::GpuHandler::default(),
+            ui:     vec![
+                ui::UIElement::new(
+                    ui::Image::new(
+                        ImageReader::open("./textures/crosshair.png").expect("No image").decode().expect("Bad decode").to_rgba8().into_raw(),
+                        16, 16
+                    ).unwrap(),
+                    ui::VerticalAnchor::Middle,
+                    ui::HorizontalAnchor::Center
+                )
+            ],
 
             player:  player,
             gameobjects: HashMap::from([
@@ -165,7 +179,12 @@ impl App {
             }
         }
 
-        return self.gpu.draw_frame(&vec![], &gpu_quads, &mut uniform);
+        let mut gpu_ui_elements: Vec<GPUUIElement> = vec![];
+        for element in &self.ui {
+            gpu_ui_elements.push(element.to_gpu());
+        }
+
+        return self.gpu.draw_frame(&vec![], &gpu_quads, &gpu_ui_elements, &mut uniform);
     }
 }
 
@@ -187,9 +206,10 @@ impl ApplicationHandler for App {
         // wgpu init is async but resumed() isn't — use pollster to block
         pollster::block_on(
             self.gpu.init(
-                window.clone(), 
-                self.config.width as u32, 
-                self.config.height as u32, 
+                window.clone(),
+                self.config.width as u32,
+                self.config.height as u32,
+                &mut self.ui,
             vec!["textures/dirt.png", "textures/grass_side.png", "textures/grass_top.png"])
         );
 
