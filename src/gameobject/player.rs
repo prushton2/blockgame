@@ -80,9 +80,9 @@ impl Player {
 
     // pub fn get_looking_at(&self, )
 
-    pub fn get_rotation(&self) -> ds::Vector3 {
-        self.rotation
-    }
+    // pub fn get_rotation(&self) -> ds::Vector3 {
+    //     self.rotation
+    // }
 
     pub fn get_camera(&self) -> &object::Camera {
         &self.camera
