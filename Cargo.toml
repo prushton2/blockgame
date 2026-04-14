@@ -7,6 +7,6 @@ edition = "2024"
 clap = "4.6.0"
 image = "0.25.10"
 pollster = "0.4.0"
-render_engine = { git="https://github.com/prushton2/renderengine.git", tag="v1.4.0", package = "RenderEngine"}
+render_engine = { git="https://github.com/prushton2/renderengine.git", tag="v1.4.1", package = "RenderEngine"}
 wgpu = "24.0.0"
 winit = "0.30.13"

@@ -6,8 +6,9 @@ use clap::{Parser};
 use render_engine::ds::Vector3;
 use render_engine::ui::ui_element::GPUUIElement;
 use render_engine::ui;
+use render_engine::wgpu_handler::GpuConfig;
 use winit::application::ApplicationHandler;
-use winit::event::{ElementState, KeyEvent, WindowEvent, DeviceEvent, DeviceId};
+use winit::event::{DeviceEvent, DeviceId, ElementState, KeyEvent, MouseButton, WindowEvent};
 use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop};
 use winit::window::{Window, WindowId, CursorGrabMode};
 use winit::keyboard::{KeyCode, PhysicalKey};
@@ -89,7 +90,7 @@ struct App {
 
 impl App {
     pub fn new(config: Config, player: gameobject::Player) -> Self {
-        Self {
+        let mut this = Self {
             window: None,
             gpu:    wgpu_handler::GpuHandler::default(),
             ui:     vec![
@@ -104,12 +105,7 @@ impl App {
             ],
 
             player:  player,
-            gameobjects: HashMap::from([
-                (Vector3::new( 0.0,  0.0, 3.0), Box::new(gameobject::Block::new_grass_block(&Vector3::new(0.0, 0.0, 3.0))) as Box<dyn GameObject>),
-                (Vector3::new( 0.0, -1.0, 3.0), Box::new(gameobject::Block::new_dirt_block(&Vector3::new(0.0, -1.0, 3.0))) as Box<dyn GameObject>),
-                (Vector3::new( 1.0, -1.0, 3.0), Box::new(gameobject::Block::new_grass_block(&Vector3::new(1.0, -1.0, 3.0))) as Box<dyn GameObject>),
-                (Vector3::new(-1.0, -1.0, 3.0), Box::new(gameobject::Block::new_grass_block(&Vector3::new(-1.0, -1.0, 3.0))) as Box<dyn GameObject>)
-            ]),
+            gameobjects: HashMap::from([]),
 
 
             keyboard:     HashMap::new(),
@@ -118,11 +114,23 @@ impl App {
 
             last_frame: std::time::Instant::now(),
             deltatime:  0.0,
+        };
+
+        for x in -10..10 {
+            for z in -10..10 {
+                this.gameobjects.extend(vec![
+                    (Vector3::new( x as f64,  3.0, z as f64), Box::new(gameobject::Block::new_grass_block(&Vector3::new(x as f64,  3.0, z as f64))) as Box<dyn GameObject>),
+                    (Vector3::new( x as f64,  2.0, z as f64), Box::new(gameobject::Block::new_dirt_block(&Vector3::new( x as f64,  2.0, z as f64))) as Box<dyn GameObject>),
+                    (Vector3::new( x as f64,  1.0, z as f64), Box::new(gameobject::Block::new_dirt_block(&Vector3::new( x as f64,  1.0, z as f64))) as Box<dyn GameObject>),
+                ]);
+                
+            }
         }
+
+        this
     }
 
     pub fn handle_movement(&mut self) {
-        // let mut player_ref = self.player();
         let key_movements: &[(KeyCode, ds::Vector3)] = &[
             (KeyCode::KeyW,        ds::Vector3::new( 0.0,  0.0,  1.0)),
             (KeyCode::KeyS,        ds::Vector3::new( 0.0,  0.0, -1.0)),
@@ -209,7 +217,12 @@ impl ApplicationHandler for App {
                 self.config.width as u32,
                 self.config.height as u32,
                 &mut self.ui,
-            vec!["textures/dirt.png", "textures/grass_side.png", "textures/grass_top.png"])
+                vec!["textures/dirt.png", "textures/grass_side.png", "textures/grass_top.png"],
+                GpuConfig {
+                    quad_buffer_max: 100*100*3*6,
+                    sphere_buffer_max: 48
+                }
+            )
         );
 
         std::thread::sleep(std::time::Duration::from_millis(1000));
@@ -227,6 +240,9 @@ impl ApplicationHandler for App {
             DeviceEvent::MouseMotion { delta: (dx, dy) } => {
                 self.mouse_delta = (self.mouse_delta.0 + (dx as f64)*self.config.sensitivity, self.mouse_delta.1 + (dy as f64)*self.config.sensitivity);
             },
+            DeviceEvent::Button { button, state } => {
+                println!("{:?}: {:?}", button, state);
+            }
             _ => {}
         }
     }
@@ -294,29 +310,35 @@ impl ApplicationHandler for App {
                 match (keycode, state) {
                     // special functions
                     (KeyCode::Escape, ElementState::Pressed) => event_loop.exit(),
-                    (KeyCode::KeyE, ElementState::Pressed) => {
+                    (keycode, pressed) => {
+                        // everything else is mapped to the keyboard hashmap
+                        self.keyboard.insert(keycode, pressed == ElementState::Pressed);
+                    }
+                }
+            },
+
+            WindowEvent::MouseInput { device_id: _, state, button } => {
+                match (button, state) {
+                    (MouseButton::Right, ElementState::Pressed) => {
                         let ray = self.player.forward_ray();
                         let looking_at = match self.player.get_looking_at(&self.gameobjects) {
                             Some(t) => t,
                             None => return
                         };
-
+    
                         let new_center = looking_at.gameobject.get_pos() - looking_at.renderable.normal(&ray.at(looking_at.t));
                         
                         self.gameobjects.insert(new_center, Box::new(gameobject::Block::new_dirt_block(&new_center)));
                     },
-                    (KeyCode::KeyQ, ElementState::Pressed) => {
+                    (MouseButton::Left, ElementState::Pressed) => {
                         let looking_at = match self.player.get_looking_at(&self.gameobjects) {
                             Some(t) => t,
                             None => return
                         };
                         
                         self.gameobjects.remove(&looking_at.gameobject.get_pos());
-                    }
-                    (keycode, pressed) => {
-                        // everything else is mapped to the keyboard hashmap
-                        self.keyboard.insert(keycode, pressed == ElementState::Pressed);
-                    }
+                    },
+                    _ => {}
                 }
             }
 
@@ -332,7 +354,7 @@ fn main() {
     let config: Config = args.into();
 
     let player = gameobject::Player::new(
-        ds::Vector3::new(0.0, 0.0, 0.0),
+        ds::Vector3::new(0.0, 4.0, 0.0),
         ds::Vector3::zero(),
         config.fov,
         (config.width as f64, config.height as f64),

@@ -78,8 +78,6 @@ impl Player {
         return closest;
     }
 
-    // pub fn get_looking_at(&self, )
-
     // pub fn get_rotation(&self) -> ds::Vector3 {
     //     self.rotation
     // }
